@@ -19,8 +19,8 @@ import aurora.*;
  */
 public class Configuration implements AuroraConfigurable {
 
-	private static String tempDir = System.getProperty("user.home") + "\\ARG\\tempfiles";
-	private static String filesDir = System.getProperty("user.home") + "\\ARG\\files";
+	private static String tempDir = System.getProperty("user.home") + "/ARG/tempfiles";
+	private static String filesDir = System.getProperty("user.home") + "/ARG/files";
 	public static boolean rgguilaunched = false;
 	
 	private JTextArea textarea;

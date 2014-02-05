@@ -4,8 +4,16 @@
 
 package aurora.hwc;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.PrintStream;
+import java.nio.charset.Charset;
 import java.util.*;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.w3c.dom.Document;
@@ -30,6 +38,8 @@ public final class NodeHWCNetwork extends AbstractNodeComplex {
 	
 	protected DirectionsCache dircache = null;
 	protected IntersectionCache ixcache = null;
+	
+	protected BufferedWriter out_writer;
 	
 
 	public NodeHWCNetwork() { }
@@ -135,8 +145,341 @@ public final class NodeHWCNetwork extends AbstractNodeComplex {
 				}
 			}
 		}
+		// FIXME:
+		//dumpCSV();
+		//readCSVFile();
+		//readCSVOfframpFile();
+		//readCSVOfframpFile2();
+		
+		String file_name = "C:/tmp/CSMP_680/betas.csv";
+		File file = new File(file_name);
+		
+		try {
+
+			if (!file.exists()) {
+				file.createNewFile();
+			}
+
+			FileWriter fw = new FileWriter(file.getAbsoluteFile());
+			out_writer = new BufferedWriter(fw);
+		} catch(IOException e) {
+			System.err.println("Error opening the CSV file '" + file_name + "':\n" + e.getMessage());
+		}
+		
+		
 		return res;
 	}
+	
+	
+	public BufferedWriter getOutWriter() {
+		return out_writer;
+	}
+	
+	
+	private void dumpCSV() {
+		String file_in = "C:/alexk/Work/I680_CSMP/DataFudging/680NB_Config.csv";
+		String file_out = "C:/alexk/Work/I680_CSMP/DataFudging/I680NB_Config.csv";
+		String[] ramps = {"", "/", "\\", "<"};
+		
+		try {
+			InputStream fis = new FileInputStream(file_in);
+			BufferedReader br = new BufferedReader(new InputStreamReader(fis, Charset.forName("UTF-8")));
+			String buf;
+			
+			File file = new File(file_out);
+
+			if (!file.exists()) {
+				file.createNewFile();
+			}
+
+			FileWriter fw = new FileWriter(file.getAbsoluteFile());
+			BufferedWriter bw = new BufferedWriter(fw);
+			
+			bw.write("\"Link ID\",\"Abs. Postmile\",\"Length (miles)\",\"GP Lanes\",\"GP Capacity (vph)\",\"Aux. Lanes\",\"Aux. Capacity (vph)\",\"HOV Lanes\",\"HOV Capacity (vph)\",\"Free Flow Speed (mph)\",\"Layout\",\"Name\"\n");
+			
+			while ((buf = br.readLine()) != null) {
+				bw.write(buf);
+				String[] blocks = buf.split(",");
+				int id = Integer.parseInt(blocks[0]);
+				int gp_ln = Integer.parseInt(blocks[3]);
+				int aux_ln = Integer.parseInt(blocks[5]);
+				int hov_ln = Integer.parseInt(blocks[7]);
+				AbstractLinkHWC lnk = (AbstractLinkHWC)getLinkById(id);
+				if (lnk == null) {
+					System.err.println(id + "\n");
+					continue;
+				}
+				AbstractNode bn = lnk.getBeginNode();
+				AbstractNode en = lnk.getEndNode();
+				String layout = "";
+				String name = "";
+				int ind = 0;
+				if ((bn !=  null) && (bn.getSuccessors().size() > 1)) {
+					ind++;
+					name += bn.getName();
+				}
+				if ((en != null) && (en.getPredecessors().size() > 1)) {
+					ind = ind + 2;
+					if (ind == 3)
+						name += "; ";
+					name += en.getName();
+				}
+						
+				layout = ramps[ind];
+				for (int i = 0; i < aux_ln; i++)
+					layout += ":";
+				for (int i = 0; i < gp_ln; i++)
+					layout += "|";
+				for (int i = 0; i < hov_ln; i++)
+					layout += "H";
+				bw.write(",\"" + layout + "\",\"" + name + "\"\n");
+				
+			}
+			
+			br.close();
+			br = null;
+			fis = null;
+			bw.close();
+			bw = null;
+		} catch(IOException e) {
+			System.err.println("Error generating file '" + file_out + "':\n" + e.getMessage());
+		}
+	
+		return;
+	}
+	
+	private void readCSVFile() {
+		String file_name = "C:/tmp/CSMP_680/680N_cfg.csv";
+		try {
+			InputStream fis = new FileInputStream(file_name);
+			BufferedReader br = new BufferedReader(new InputStreamReader(fis, Charset.forName("UTF-8")));
+			String buf;
+			
+			while ((buf = br.readLine()) != null) {
+				String[] blocks = buf.split(",");
+				int id = Integer.parseInt(blocks[0]);
+				double cap = Double.parseDouble(blocks[1]);
+				double num_lanes = cap / 1900;
+				double cd = Double.parseDouble(blocks[2]);
+				double jd = Double.parseDouble(blocks[3]);
+				double hcap = Double.parseDouble(blocks[4]);
+				double hcd = Double.parseDouble(blocks[5]);
+				double hjd = Double.parseDouble(blocks[6]);
+			
+				AbstractLinkHWC lk = (AbstractLinkHWC)this.getLinkById(id);
+				lk.setLanes(num_lanes);
+				lk.setFD(cap, cd, jd, 0);
+				/*if (lk.getBeginNode() != null)
+					System.err.println(lk.getBeginNode().getId() + "   " + lk.getBeginNode().getSuccessors().firstElement().getTypeLetterCode());
+				else
+					System.err.println("0");
+				*/
+				if (hcap > 0) {
+					AbstractNodeHWC bn = (AbstractNodeHWC)lk.getBeginNode();
+					AbstractNodeHWC en = (AbstractNodeHWC)lk.getEndNode();
+					LinkFwHOV hlk = new LinkFwHOV();
+					hlk.setId(-2000+id);
+					hlk.setMyNetwork(this);
+					hlk.setLength(lk.getLength());
+					hlk.setLanes(1);
+					hlk.setBeginNode(bn);
+					hlk.setEndNode(en);
+					hlk.setFD(hcap, hcd, hjd, 0);
+					addLink(hlk);
+					if (bn != null)
+						bn.addOutLink(hlk);
+					if (en != null)
+						en.addInLink(hlk);
+				}
+			}
+			
+			
+			br.close();
+			br = null;
+			fis = null;
+		} catch(IOException e) {
+			System.err.println("Error reading the CSV file '" + file_name + "':\n" + e.getMessage());
+		}
+		
+		return;
+	}
+	
+	private void readCSVOfframpFile() {
+		String file_name = "C:/tmp/CSMP_680/680N_offramps2.csv";
+		String file_name2 = "C:/tmp/CSMP_680/680N_sr.xml";
+		
+		try {
+			InputStream fis = new FileInputStream(file_name);
+			BufferedReader br = new BufferedReader(new InputStreamReader(fis, Charset.forName("UTF-8")));
+			String buf;
+			
+			File file = new File(file_name2);
+
+			if (!file.exists()) {
+				file.createNewFile();
+			}
+
+			FileWriter fw = new FileWriter(file.getAbsoluteFile());
+			BufferedWriter bw = new BufferedWriter(fw);
+			
+			bw.write("<SplitRatioProfileSet>\n");
+			
+			while ((buf = br.readLine()) != null) {
+				String[] blocks = buf.split(",");
+				int nid = Integer.parseInt(blocks[1]);
+				int lid = Integer.parseInt(blocks[2]);
+				
+				AbstractNodeHWC nd = (AbstractNodeHWC)this.getNodeById(nid);
+				if ((nd == null) || (nd.getSuccessors().size() < 2))
+					continue;
+				
+				bw.write("<splitratios node_id=\"" + nid + "\" start_time=\"0\" dt=\"300\">\n");
+				Vector<AbstractNetworkElement> ins = nd.getPredecessors();
+				Vector<AbstractNetworkElement> outs = nd.getSuccessors();
+				int m = ins.size();
+				int n = outs.size();
+				for (int ii = 3; ii < 291; ii++) {
+					bw.write("<srm>");
+					for (int i = 0; i < m; i++) {
+						for (int j = 0; j < n; j++) {
+							AbstractLinkHWC ilk = (AbstractLinkHWC)ins.get(i);
+							AbstractLinkHWC olk = (AbstractLinkHWC)outs.get(j);
+							if (olk.getType() == TypesHWC.LINK_OFFRAMP) {
+								if ((ilk.getType() == TypesHWC.LINK_ONRAMP) || (lid != olk.getId()))
+									bw.write("0:0");
+								else {
+									bw.write(blocks[ii] + ":" + blocks[ii]);
+								}
+							} else if (olk.getType() == TypesHWC.LINK_HOV) {
+								if (((ii >= 62) && (ii < 110)) || ((ii >= 182) && (ii < 230)))
+									bw.write("0:-1");
+								else
+									bw.write("-1:-1");
+							} else if (olk.getType() == TypesHWC.LINK_FREEWAY) {
+								bw.write("-1:-1");
+							}
+							if (j < n-1)
+								bw.write(", ");
+						}
+						if (i < m-1)
+							bw.write("; ");
+					}
+					
+					bw.write("</srm>\n");
+				}
+				bw.write("</splitratios>\n");
+				
+			}
+			
+			bw.write("</SplitRatioProfileSet>\n");
+			br.close();
+			bw.close();
+			br = null;
+			bw = null;
+			fis = null;
+		} catch(IOException e) {
+			System.err.println("Error reading the CSV file '" + file_name + "':\n" + e.getMessage());
+		}
+		
+		return;
+	}
+	
+	private void readCSVOfframpFile2() {
+		String file_name = "C:/tmp/CSMP_680/680N_offramps2.csv";
+		String file_name2 = "C:/tmp/CSMP_680/680N_sr.xml";
+		
+		try {
+			InputStream fis = new FileInputStream(file_name);
+			BufferedReader br = new BufferedReader(new InputStreamReader(fis, Charset.forName("UTF-8")));
+			String buf;
+			
+			File file = new File(file_name2);
+
+			if (!file.exists()) {
+				file.createNewFile();
+			}
+
+			FileWriter fw = new FileWriter(file.getAbsoluteFile());
+			BufferedWriter bw = new BufferedWriter(fw);
+			
+			bw.write("<SplitRatioSet project_id=\"4\" id=\"1\">\n");
+			
+			int srp_id = 1;
+			while ((buf = br.readLine()) != null) {
+				String[] blocks = buf.split(",");
+				int nid = Integer.parseInt(blocks[1]);
+				int lid = Integer.parseInt(blocks[2]);
+				
+				AbstractNodeHWC nd = (AbstractNodeHWC)this.getNodeById(nid);
+				if ((nd == null) || (nd.getSuccessors().size() < 2))
+					continue;
+				
+				bw.write("<splitRatioProfile id=\"" + srp_id++ + "\" node_id=\"" + nid + "\" start_time=\"0\" dt=\"300\">\n");
+				Vector<AbstractNetworkElement> ins = nd.getPredecessors();
+				Vector<AbstractNetworkElement> outs = nd.getSuccessors();
+				int m = ins.size();
+				int n = outs.size();
+				for (int i = 0; i < m; i++) {
+					for (int j = 0; j < n; j++) {
+						AbstractLinkHWC ilk = (AbstractLinkHWC)ins.get(i);
+						AbstractLinkHWC olk = (AbstractLinkHWC)outs.get(j);
+						bw.write("<splitratio vehicle_type_id=\"0\" link_in=\"" + ilk.getId() + "\" link_out=\"" + outs.get(j).getId() + "\">" );
+						for (int ii = 3; ii < 291; ii++) {
+							if (olk.getType() == TypesHWC.LINK_OFFRAMP) {
+								if ((ilk.getType() == TypesHWC.LINK_ONRAMP) || (lid != olk.getId()))
+									bw.write("0");
+								else
+									bw.write(blocks[ii]);
+							} else if (olk.getType() == TypesHWC.LINK_HOV) {
+								if (((ii >= 62) && (ii < 110)) || ((ii >= 182) && (ii < 230)))
+									bw.write("-1");
+								else
+									bw.write("-1");
+							} else if (olk.getType() == TypesHWC.LINK_FREEWAY) {
+								bw.write("-1");
+							}
+							if (ii < 290)
+								bw.write(",");
+						}
+						bw.write("</splitratio>\n");
+						bw.write("<splitratio vehicle_type_id=\"1\" link_in=\"" + ilk.getId() + "\" link_out=\"" + outs.get(j).getId() + "\">" );
+						for (int ii = 3; ii < 291; ii++) {
+							if (olk.getType() == TypesHWC.LINK_OFFRAMP) {
+								if ((ilk.getType() == TypesHWC.LINK_ONRAMP) || (lid != olk.getId()))
+									bw.write("0");
+								else
+									bw.write(blocks[ii]);
+							} else if (olk.getType() == TypesHWC.LINK_HOV) {
+								if (((ii >= 62) && (ii < 110)) || ((ii >= 182) && (ii < 230)))
+									bw.write("0");
+								else
+									bw.write("-1");
+							} else if (olk.getType() == TypesHWC.LINK_FREEWAY) {
+								bw.write("-1");
+							}
+							if (ii < 290)
+								bw.write(",");
+						}
+						bw.write("</splitratio>\n");
+					}
+				}
+				bw.write("</splitRatioProfile>\n");
+				
+			}
+			
+			bw.write("</SplitRatioSet>\n");
+			br.close();
+			bw.close();
+			br = null;
+			bw = null;
+			fis = null;
+		} catch(IOException e) {
+			System.err.println("Error reading the CSV file '" + file_name + "':\n" + e.getMessage());
+		}
+		
+		return;
+	}
+	
 	
 	/**
 	 * Generates XML buffer for the initial density profile.<br>

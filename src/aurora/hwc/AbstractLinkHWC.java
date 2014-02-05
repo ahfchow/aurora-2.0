@@ -323,6 +323,7 @@ public abstract class AbstractLinkHWC extends AbstractLink {
 		AuroraInterval fmr = new AuroraInterval(flowMaxRange.getCenter(), flowMaxRange.getSize());
 		fmr.affineTransform(1/lanes, 0);
 		out.print("  <fd densityCritical =\"" + Double.toString(densityCritical/lanes) + "\" densityJam=\"" + Double.toString(densityJam/lanes) + "\" flowMax=\"" + fmr.toString() + "\" capacityDrop=\"" + Double.toString(capacityDrop/lanes) + "\"/>\n");
+		//out.print("  <fd densityCritical =\"" + Double.toString(densityCritical/lanes) + "\" densityJam=\"" + Double.toString(densityJam/lanes) + "\" flowMax=\"" + Double.toString(flowMaxRange.getCenter()/lanes) + "\" capacityDrop=\"" + Double.toString(capacityDrop/lanes) + "\"/>\n");
 		out.print("</link>\n");
 		return;
 	}

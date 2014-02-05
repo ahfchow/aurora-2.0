@@ -73,8 +73,9 @@ public class PathHWC extends Path {
 		AuroraIntervalVector flows[] = new AuroraIntervalVector[linkCount];
 		for (int i = 0; i < linkCount; i++) {
 			AbstractLinkHWC lk = (AbstractLinkHWC)linkSequence.get(i);
-			flows[i] = lk.getActualFlow();
-			flows[i].affineTransform(1/lk.getLanes(), 0);
+			flows[i] = lk.getAverageInFlow();
+			//flows[i] = lk.getActualFlow();
+			//flows[i].affineTransform(1/lk.getLanes(), 0);
 		}
 		return flows;
 	}

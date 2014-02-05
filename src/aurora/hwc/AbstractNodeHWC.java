@@ -653,6 +653,15 @@ public abstract class AbstractNodeHWC extends AbstractNodeSimple {
 		for (int j = 0; j < nOut; j++)
 			for (int i = 0; i < nIn; i++)
 				for (int ii = 0; ii < nTypes; ii++) {
+					/*try {
+						int vt_id = 0;
+						if (ii == 0)
+							vt_id = 1;
+						// ts, node_id, inlink_id, outlink_id, veh_type, beta
+						((NodeHWCNetwork)getMyNetwork()).getOutWriter().write(5*ts + "," + id + "," + getPredecessors().get(i).getId() + "," + getSuccessors().get(j).getId() + "," + vt_id + "," + srm[i + ii*nIn][j] + "\n");
+					} catch(IOException e) {
+						System.err.println("Error writing the Betas CSV file:\n" + e.getMessage());
+					}*/
 					splitRatioMatrix[i][j].get(ii).setCenter(srm[i + ii*nIn][j], 0);
 				}
 		//
